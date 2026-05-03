@@ -4,8 +4,8 @@ plugins {
 }
 
 allprojects {
-    group = "pl.notkris"
-    version = "1.0.0"
+    group = "com.github.xKrisSx"
+    version = "1.0.1"
 
     repositories {
         mavenCentral()
