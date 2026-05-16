@@ -5,6 +5,77 @@ Instead of manually registering every class, you annotate it — AAAPI handles t
 
 ---
 
+## Requirements to build
+
+- Java 21+
+- Gradle with Kotlin DSL
+
+---
+
+## Installation
+### Gradle
+Add JitPack to your repositories:
+
+```kotlin
+repositories {
+    maven("https://jitpack.io")
+}
+```
+
+Then add the dependency:
+
+```kotlin
+dependencies {
+    implementation("com.github.xKrisSx.aaapi:core:1.0.0")
+
+    // optional Guice support:
+    implementation("com.github.xKrisSx.aaapi:guice:1.0.0")
+}
+```
+
+### Maven
+Add JitPack to your repositories:
+
+```xml
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+```
+
+Then add the dependency:
+
+```xml
+    <dependency>
+        <groupId>com.github.xKrisSx.aaapi</groupId>
+        <artifactId>core</artifactId>
+        <version>1.0.1</version>
+    </dependency>
+    <!-- optional Guice support: -->
+    <dependency>
+        <groupId>com.github.xKrisSx.aaapi</groupId>
+        <artifactId>guice</artifactId>
+        <version>1.0.1</version>
+    </dependency>
+```
+
+---
+
+## Modules
+
+| Module | Description |
+|---|---|
+| `core` | Main API |
+| `guice` | Optional Google Guice DI integration |
+| `examples/paper` | Paper Brigadier commands, listeners, tasks |
+| `examples/cloud` | Cloud command framework integration |
+| `examples/acf` | Aikar's Command Framework integration |
+| `examples/lite-commands` | LiteCommands integration |
+| `examples/guice-example` | Guice dependency injection example |
+
+---
+
+# Why AAAPI?
 ## The problem
 
 ```java
@@ -30,20 +101,6 @@ public class JoinListener implements Listener { ... }
 registry.register(new ListenerLoader(this));
 registry.loadAll(); // finds and registers everything automatically
 ```
-
----
-
-## Modules
-
-| Module | Description |
-|---|---|
-| `core` | Main API |
-| `guice` | Optional Google Guice DI integration |
-| `examples/paper` | Paper Brigadier commands, listeners, tasks |
-| `examples/cloud` | Cloud command framework integration |
-| `examples/acf` | Aikar's Command Framework integration |
-| `examples/lite-commands` | LiteCommands integration |
-| `examples/guice-example` | Guice dependency injection example |
 
 ---
 
@@ -161,35 +218,5 @@ public class JoinListener implements Listener {
     public JoinListener(GreetingService greetingService) {
         this.greetingService = greetingService;
     }
-}
-```
-
----
-
-## Requirements
-
-- Java 21+
-- Gradle with Kotlin DSL
-
----
-
-## Installation
-
-Add JitPack to your repositories:
-
-```kotlin
-repositories {
-    maven("https://jitpack.io")
-}
-```
-
-Then add the dependency:
-
-```kotlin
-dependencies {
-    implementation("com.github.xKrisSx:aaapi:core:1.0.0")
-
-    // optional Guice support:
-    implementation("com.github.xKrisSx:aaapi:guice:1.0.0")
 }
 ```
