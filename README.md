@@ -26,10 +26,10 @@ Then add the dependency:
 
 ```kotlin
 dependencies {
-    implementation("com.github.xKrisSx.aaapi:core:1.1.0")
+    implementation("com.github.xKrisSx.aaapi:core:1.1.1")
 
     // optional Guice support (brings Guice 7 transitively):
-    implementation("com.github.xKrisSx.aaapi:guice:1.1.0")
+    implementation("com.github.xKrisSx.aaapi:guice:1.1.1")
 }
 ```
 
@@ -49,13 +49,13 @@ Then add the dependency:
     <dependency>
         <groupId>com.github.xKrisSx.aaapi</groupId>
         <artifactId>core</artifactId>
-        <version>1.1.0</version>
+        <version>1.1.1</version>
     </dependency>
     <!-- optional Guice support: -->
     <dependency>
         <groupId>com.github.xKrisSx.aaapi</groupId>
         <artifactId>guice</artifactId>
-        <version>1.1.0</version>
+        <version>1.1.1</version>
     </dependency>
 ```
 
