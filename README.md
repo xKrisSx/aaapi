@@ -26,10 +26,10 @@ Then add the dependency:
 
 ```kotlin
 dependencies {
-    implementation("com.github.xKrisSx.aaapi:core:1.1.1")
+    implementation("com.github.xKrisSx.aaapi:core:1.2.0")
 
     // optional Guice support (brings Guice 7 transitively):
-    implementation("com.github.xKrisSx.aaapi:guice:1.1.1")
+    implementation("com.github.xKrisSx.aaapi:guice:1.2.0")
 }
 ```
 
@@ -49,13 +49,13 @@ Then add the dependency:
     <dependency>
         <groupId>com.github.xKrisSx.aaapi</groupId>
         <artifactId>core</artifactId>
-        <version>1.1.1</version>
+        <version>1.2.0</version>
     </dependency>
     <!-- optional Guice support: -->
     <dependency>
         <groupId>com.github.xKrisSx.aaapi</groupId>
         <artifactId>guice</artifactId>
-        <version>1.1.1</version>
+        <version>1.2.0</version>
     </dependency>
 ```
 
@@ -168,8 +168,12 @@ registry.loadAll();
 - A class must carry the annotation **directly**. Subclasses of an annotated class are not registered
   (unless the annotation is marked `@Inherited`).
 - Abstract classes and interfaces are skipped.
+- Loaders run in **registration order**: the first registered loader processes all its classes before the next one starts.
+  Re-registering a loader for the same annotation replaces it in place.
 - A class annotated for several loaders is instantiated **once** and the same instance is passed to every matching loader.
-- A failure of one class (constructor or loader exception) is logged and doesn't stop the remaining classes.
+- A failure of one class (constructor or loader exception, or a `LinkageError` such as `NoClassDefFoundError`
+  from a missing `softdepend` plugin) is logged, the class is skipped by the remaining loaders,
+  and the other classes are still registered.
 
 > **Paper:** if you register commands inside `LifecycleEvents.COMMANDS`, use a separate registry for them.
 > That event fires again on `/minecraft:reload`, so calling `loadAll()` for listeners there would register them twice.

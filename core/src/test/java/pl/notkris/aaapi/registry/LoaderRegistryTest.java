@@ -11,6 +11,7 @@ import pl.notkris.aaapi.loader.ClassTypeLoader;
 import pl.notkris.aaapi.provider.DefaultInstanceProvider;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,5 +105,100 @@ class LoaderRegistryTest {
 
         assertTrue(replaced.processed.isEmpty());
         assertEquals(3, replacement.processed.size());
+    }
+
+    @Test
+    void linkageErrorOfOneClassDoesNotStopOthers() {
+        RecordingLoader first = new RecordingLoader(First.class) {
+            @Override
+            public void process(Class<?> clazz, Object instance) {
+                if (clazz == Annotated.class) {
+                    throw new NoClassDefFoundError("org/example/MissingSoftDependency");
+                }
+                super.process(clazz, instance);
+            }
+        };
+
+        LoaderRegistry registry = registry();
+        registry.register(first);
+        registry.loadAll();
+
+        assertEquals(List.of(BothAnnotations.class, NestedAnnotated.class), List.copyOf(first.processed.keySet()));
+    }
+
+    @Test
+    void failedClassIsSkippedByLaterLoaders() {
+        RecordingLoader first = new RecordingLoader(First.class) {
+            @Override
+            public void process(Class<?> clazz, Object instance) {
+                if (clazz == BothAnnotations.class) {
+                    throw new IllegalStateException("expected test failure");
+                }
+                super.process(clazz, instance);
+            }
+        };
+        RecordingLoader second = new RecordingLoader(Second.class);
+
+        LoaderRegistry registry = registry();
+        registry.register(first);
+        registry.register(second);
+        registry.loadAll();
+
+        assertEquals(List.of(PrivateConstructor.class), List.copyOf(second.processed.keySet()));
+    }
+
+    @Test
+    void loadersRunInRegistrationOrder() {
+        List<String> calls = new ArrayList<>();
+        RecordingLoader first = new RecordingLoader(First.class) {
+            @Override
+            public void process(Class<?> clazz, Object instance) {
+                calls.add("first:" + clazz.getSimpleName());
+            }
+        };
+        RecordingLoader second = new RecordingLoader(Second.class) {
+            @Override
+            public void process(Class<?> clazz, Object instance) {
+                calls.add("second:" + clazz.getSimpleName());
+            }
+        };
+
+        LoaderRegistry registry = registry();
+        registry.register(second);
+        registry.register(first);
+        registry.loadAll();
+
+        assertEquals(List.of(
+                "second:BothAnnotations",
+                "second:PrivateConstructor",
+                "first:Annotated",
+                "first:BothAnnotations",
+                "first:NestedAnnotated"
+        ), calls);
+    }
+
+    @Test
+    void replacedLoaderKeepsItsPosition() {
+        List<String> calls = new ArrayList<>();
+        RecordingLoader second = new RecordingLoader(Second.class) {
+            @Override
+            public void process(Class<?> clazz, Object instance) {
+                calls.add("second");
+            }
+        };
+        RecordingLoader replacement = new RecordingLoader(First.class) {
+            @Override
+            public void process(Class<?> clazz, Object instance) {
+                calls.add("first");
+            }
+        };
+
+        LoaderRegistry registry = registry();
+        registry.register(new RecordingLoader(First.class));
+        registry.register(second);
+        registry.register(replacement);
+        registry.loadAll();
+
+        assertEquals(List.of("first", "first", "first", "second", "second"), calls);
     }
 }

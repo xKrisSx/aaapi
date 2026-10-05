@@ -1,13 +1,15 @@
 package pl.notkris.aaapi.registry;
 
-import pl.notkris.aaapi.exception.LoaderNotFoundException;
 import pl.notkris.aaapi.loader.ClassTypeLoader;
 import pl.notkris.aaapi.provider.InstanceProvider;
 import pl.notkris.aaapi.scanner.AnnotationScanner;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,8 +32,9 @@ import java.util.stream.Collectors;
  * registry.loadAll();
  * }</pre>
  *
- * <p>A class carrying annotations of several registered loaders is instantiated once,
- * and the same instance is passed to each matching loader.
+ * <p>Loaders run in registration order, so in the example above all commands are
+ * registered before any listener. A class carrying annotations of several registered
+ * loaders is instantiated once, and the same instance is passed to each matching loader.
  */
 public class LoaderRegistry {
 
@@ -67,21 +70,35 @@ public class LoaderRegistry {
 
     /**
      * Registers a loader for a specific annotation type.
-     * If a loader for the same annotation is already registered, it will be replaced.
+     * If a loader for the same annotation is already registered, it is replaced
+     * and the replacement keeps its position in the processing order.
+     *
+     * <p>Loaders are run in registration order, see {@link #loadAll()}.
      *
      * @param loader the loader to register
      */
     public void register(ClassTypeLoader loader) {
-        loaders.removeIf(existing -> existing.type() == loader.type());
+        for (int i = 0; i < loaders.size(); i++) {
+            if (loaders.get(i).type() == loader.type()) {
+                loaders.set(i, loader);
+                return;
+            }
+        }
         loaders.add(loader);
     }
 
     /**
-     * Scans the base package, creates instances of all discovered classes,
+     * Scans the base package once, creates instances of all discovered classes,
      * and delegates each to every matching {@link ClassTypeLoader}.
      *
-     * <p>A failure for one class (instantiation or processing) is logged
-     * and does not stop the registration of the remaining classes.
+     * <p>Loaders are run in registration order: the first registered loader processes
+     * all of its classes before the next one starts. A class matched by several loaders
+     * is instantiated once, when the first of them needs it.
+     *
+     * <p>A failure for one class (instantiation, processing or a {@link LinkageError}
+     * such as {@link NoClassDefFoundError} caused by a missing optional dependency)
+     * is logged, the class is skipped by the remaining loaders,
+     * and the registration of other classes continues.
      */
     public void loadAll() {
         Set<Class<? extends Annotation>> types = loaders.stream()
@@ -91,39 +108,36 @@ public class LoaderRegistry {
         AnnotationScanner scanner = new AnnotationScanner(basePackage, classLoader, types);
         List<Class<?>> classes = scanner.scan();
 
-        int success = 0;
-        int failed = 0;
+        Map<Class<?>, Object> instances = new HashMap<>();
+        Set<Class<?>> failed = new HashSet<>();
         long start = System.currentTimeMillis();
 
-        for (Class<?> clazz : classes) {
-            try {
-                List<ClassTypeLoader> matching = findLoaders(clazz);
-                Object instance = instanceProvider.getInstance(clazz);
-
-                for (ClassTypeLoader loader : matching) {
-                    loader.process(clazz, instance);
+        for (ClassTypeLoader loader : loaders) {
+            for (Class<?> clazz : classes) {
+                if (failed.contains(clazz)) {
+                    continue;
                 }
-                success++;
-            } catch (Exception e) {
-                logger.log(Level.SEVERE, "Failed to register: " + clazz.getName(), e);
-                failed++;
+                try {
+                    if (!clazz.isAnnotationPresent(loader.type())) {
+                        continue;
+                    }
+                    Object instance = instances.get(clazz);
+                    if (instance == null) {
+                        instance = instanceProvider.getInstance(clazz);
+                        instances.put(clazz, instance);
+                    }
+                    loader.process(clazz, instance);
+                } catch (Exception | LinkageError e) {
+                    logger.log(Level.SEVERE, "Failed to register: " + clazz.getName(), e);
+                    failed.add(clazz);
+                }
             }
         }
         long time = System.currentTimeMillis() - start;
+        int success = classes.size() - failed.size();
         logger.info("Registered " + success + "/" + classes.size() + " classes in " + time + "ms");
-        if (failed > 0) {
-            logger.warning("Failed to register: " + failed + " classes");
+        if (!failed.isEmpty()) {
+            logger.warning("Failed to register: " + failed.size() + " classes");
         }
-    }
-
-    private List<ClassTypeLoader> findLoaders(Class<?> clazz) {
-        List<ClassTypeLoader> matching = loaders.stream()
-                .filter(loader -> clazz.isAnnotationPresent(loader.type()))
-                .collect(Collectors.toList());
-
-        if (matching.isEmpty()) {
-            throw new LoaderNotFoundException("No loader registered for class: " + clazz.getName());
-        }
-        return matching;
     }
 }
