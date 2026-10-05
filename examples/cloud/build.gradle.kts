@@ -11,7 +11,7 @@ repositories {
 
 dependencies {
     implementation(project(":core"))
-    compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
 
     implementation("org.incendo:cloud-core:2.0.0")
     implementation("org.incendo:cloud-annotations:2.0.0")

@@ -1,9 +1,10 @@
 package pl.notkris.example.loader;
 
+import com.google.inject.Inject;
 import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import pl.notkris.aaapi.loader.ClassTypeLoader;
-import pl.notkris.example.ExamplePlugin;
 
 import java.lang.annotation.*;
 
@@ -37,9 +38,10 @@ public class ListenerLoader extends ClassTypeLoader {
     public @interface RegisteredListener {}
 
     private final PluginManager pluginManager;
-    private final ExamplePlugin plugin;
+    private final Plugin plugin;
 
-    public ListenerLoader(PluginManager pluginManager, ExamplePlugin plugin) {
+    @Inject
+    public ListenerLoader(PluginManager pluginManager, Plugin plugin) {
         this.pluginManager = pluginManager;
         this.plugin = plugin;
     }

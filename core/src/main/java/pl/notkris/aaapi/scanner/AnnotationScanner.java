@@ -2,9 +2,12 @@ package pl.notkris.aaapi.scanner;
 
 import org.reflections.Reflections;
 import org.reflections.util.ConfigurationBuilder;
+import org.reflections.util.FilterBuilder;
 import pl.notkris.aaapi.registry.LoaderRegistry;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Modifier;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -14,6 +17,10 @@ import java.util.stream.Collectors;
  *
  * <p>Uses <a href="https://github.com/ronmamo/reflections">Reflections</a> under the hood,
  * which handles both standard classpath environments and JAR files (e.g. Spigot/Paper plugins).
+ *
+ * <p>Only concrete classes inside the base package (and its subpackages) that are
+ * <b>directly</b> annotated are returned. Subclasses of annotated classes are not included,
+ * unless the annotation is marked with {@link java.lang.annotation.Inherited @Inherited}.
  *
  * <p>You don't need to use this class directly - {@link LoaderRegistry} creates and manages
  * the scanner internally during {@link LoaderRegistry#loadAll()}.
@@ -38,18 +45,31 @@ public class AnnotationScanner {
     /**
      * Scans the base package and returns all classes annotated with any of the registered annotations.
      *
-     * @return list of discovered classes, deduplicated
+     * @return list of discovered classes, deduplicated and sorted by name
      */
     public List<Class<?>> scan() {
+        if (annotations.isEmpty()) {
+            return List.of();
+        }
+
         ConfigurationBuilder config = new ConfigurationBuilder()
                 .forPackage(basePackage, classLoader)
-                .addClassLoaders(classLoader);
+                .addClassLoaders(classLoader)
+                // forPackage() only adds the URLs (e.g. the whole plugin jar), this restricts scanning to the package
+                .filterInputsBy(new FilterBuilder().includePackage(basePackage));
 
         Reflections reflections = new Reflections(config);
 
         return annotations.stream()
-                .flatMap(annotation -> reflections.getTypesAnnotatedWith(annotation).stream())
+                // honorInherited = true: without it Reflections also returns subclasses of annotated classes
+                .flatMap(annotation -> reflections.getTypesAnnotatedWith(annotation, true).stream())
+                .filter(AnnotationScanner::isConcrete)
                 .distinct()
+                .sorted(Comparator.comparing(Class::getName))
                 .collect(Collectors.toList());
+    }
+
+    private static boolean isConcrete(Class<?> clazz) {
+        return !clazz.isInterface() && !Modifier.isAbstract(clazz.getModifiers());
     }
 }

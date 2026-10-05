@@ -26,10 +26,10 @@ Then add the dependency:
 
 ```kotlin
 dependencies {
-    implementation("com.github.xKrisSx.aaapi:core:1.0.0")
+    implementation("com.github.xKrisSx.aaapi:core:1.1.0")
 
-    // optional Guice support:
-    implementation("com.github.xKrisSx.aaapi:guice:1.0.0")
+    // optional Guice support (brings Guice 7 transitively):
+    implementation("com.github.xKrisSx.aaapi:guice:1.1.0")
 }
 ```
 
@@ -49,13 +49,13 @@ Then add the dependency:
     <dependency>
         <groupId>com.github.xKrisSx.aaapi</groupId>
         <artifactId>core</artifactId>
-        <version>1.0.1</version>
+        <version>1.1.0</version>
     </dependency>
     <!-- optional Guice support: -->
     <dependency>
         <groupId>com.github.xKrisSx.aaapi</groupId>
         <artifactId>guice</artifactId>
-        <version>1.0.1</version>
+        <version>1.1.0</version>
     </dependency>
 ```
 
@@ -69,9 +69,9 @@ Then add the dependency:
 | `guice` | Optional Google Guice DI integration |
 | `examples/paper` | Paper Brigadier commands, listeners, tasks |
 | `examples/cloud` | Cloud command framework integration |
-| `examples/acf` | Aikar's Command Framework integration |
+| `examples/aikar` | Aikar's Command Framework integration |
 | `examples/lite-commands` | LiteCommands integration |
-| `examples/guice-example` | Guice dependency injection example |
+| `examples/paper-guice` | Guice dependency injection example |
 
 ---
 
@@ -153,13 +153,26 @@ public class JoinListener implements Listener {
 LoaderRegistry registry = new LoaderRegistry(
     "com.yourpackage",              // <-- package to scan
     getClass().getClassLoader(),    // <-- classloader to use
-    new DefaultInstanceProvider()   // <-- default instance provider
+    new DefaultInstanceProvider(),  // <-- default instance provider
+    getLogger()                     // <-- optional, defaults to the "AAAPI" logger
 );
 
 // register all loaders
 registry.register(new ListenerLoader(this));
 registry.loadAll();
 ```
+
+### Scanning rules
+
+- Only classes inside the given package (and its subpackages) are scanned.
+- A class must carry the annotation **directly**. Subclasses of an annotated class are not registered
+  (unless the annotation is marked `@Inherited`).
+- Abstract classes and interfaces are skipped.
+- A class annotated for several loaders is instantiated **once** and the same instance is passed to every matching loader.
+- A failure of one class (constructor or loader exception) is logged and doesn't stop the remaining classes.
+
+> **Paper:** if you register commands inside `LifecycleEvents.COMMANDS`, use a separate registry for them.
+> That event fires again on `/minecraft:reload`, so calling `loadAll()` for listeners there would register them twice.
 
 ---
 
@@ -185,7 +198,8 @@ public void process(Class<?> clazz, Object instance) {
     Bukkit.getPluginManager().registerEvents((Listener) instance, plugin);
 
     if (clazz.isAnnotationPresent(PhysicListener.class)) {
-        WorldUtils.addPhysicListener((Listener) instance);
+        boolean enabled = clazz.getAnnotation(PhysicListener.class).isEnabledByDefault();
+        WorldUtils.addPhysicListener((Listener) instance, enabled);
     }
 }
 ```
@@ -197,13 +211,34 @@ public void process(Class<?> clazz, Object instance) {
 Swap `DefaultInstanceProvider` for `GuiceInstanceProvider` to enable full dependency injection:
 
 ```java
-Injector injector = Guice.createInjector();
+Injector injector = Guice.createInjector(new PluginModule(this));
 
 LoaderRegistry registry = new LoaderRegistry(
     "com.yourpackage",
     getClass().getClassLoader(),
-    new GuiceInstanceProvider(injector) // <-- only change
+    new GuiceInstanceProvider(injector), // <-- only change
+    getLogger()
 );
+```
+
+A module makes the plugin and server objects injectable:
+
+```java
+public class PluginModule extends AbstractModule {
+
+    private final MyPlugin plugin;
+
+    public PluginModule(MyPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    protected void configure() {
+        bind(MyPlugin.class).toInstance(plugin);
+        bind(Plugin.class).toInstance(plugin);
+        bind(Server.class).toInstance(plugin.getServer());
+    }
+}
 ```
 
 Your classes can now use `@Inject` constructors:
@@ -220,3 +255,19 @@ public class JoinListener implements Listener {
     }
 }
 ```
+
+```java
+@Singleton // <-- one shared instance; without it every injection point gets a new one
+public class GreetingService { ... }
+```
+
+Notes:
+- Use `com.google.inject.Inject` or `jakarta.inject.Inject`. Guice 7 does **not** recognize the legacy `javax.inject.Inject`.
+- Paper already ships Guava (a Guice dependency), so you can exclude it from your shadow jar:
+  ```kotlin
+  tasks.shadowJar {
+      dependencies {
+          exclude(dependency("com.google.guava:.*"))
+      }
+  }
+  ```

@@ -34,7 +34,8 @@ public class ExamplePlugin extends JavaPlugin {
         LoaderRegistry registry = new LoaderRegistry(
                 "pl.notkris.example",
                 getClass().getClassLoader(),
-                new DefaultInstanceProvider()
+                new DefaultInstanceProvider(),
+                getLogger()
         );
 
         PaperCommandManager<CommandSourceStack> commandManager = PaperCommandManager.builder()

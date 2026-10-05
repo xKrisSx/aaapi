@@ -19,6 +19,14 @@ import pl.notkris.aaapi.provider.InstanceProvider;
  *     new GuiceInstanceProvider(injector)
  * );
  * }</pre>
+ *
+ * <p>Notes:
+ * <ul>
+ *   <li>Guice creates a new instance for every injection point unless the type is scoped -
+ *       annotate shared services with {@code @Singleton} (or bind them in a module).</li>
+ *   <li>Guice 7 supports {@code com.google.inject.Inject} and {@code jakarta.inject.Inject}.
+ *       The legacy {@code javax.inject.Inject} is <b>not</b> recognized.</li>
+ * </ul>
  */
 public class GuiceInstanceProvider implements InstanceProvider {
 

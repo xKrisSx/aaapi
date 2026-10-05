@@ -21,32 +21,48 @@ import java.util.stream.Collectors;
  * LoaderRegistry registry = new LoaderRegistry(
  *     "com.yourpackage",
  *     getClass().getClassLoader(),
- *     new DefaultInstanceProvider()
+ *     new DefaultInstanceProvider(),
+ *     getLogger()
  * );
  *
  * registry.register(new CommandLoader(this));
  * registry.register(new ListenerLoader(this));
  * registry.loadAll();
  * }</pre>
+ *
+ * <p>A class carrying annotations of several registered loaders is instantiated once,
+ * and the same instance is passed to each matching loader.
  */
 public class LoaderRegistry {
-
-    private static final Logger logger = Logger.getLogger("AAAPI");
 
     private final String basePackage;
     private final ClassLoader classLoader;
     private final InstanceProvider instanceProvider;
+    private final Logger logger;
     private final List<ClassTypeLoader> loaders = new ArrayList<>();
 
     /**
+     * Creates a registry that logs to the {@code "AAAPI"} logger.
+     *
      * @param basePackage      the root package to scan recursively (e.g. {@code "com.yourpackage"})
      * @param classLoader      the class loader used to scan and load classes
      * @param instanceProvider the provider used to create instances of discovered classes
      */
     public LoaderRegistry(String basePackage, ClassLoader classLoader, InstanceProvider instanceProvider) {
+        this(basePackage, classLoader, instanceProvider, Logger.getLogger("AAAPI"));
+    }
+
+    /**
+     * @param basePackage      the root package to scan recursively (e.g. {@code "com.yourpackage"})
+     * @param classLoader      the class loader used to scan and load classes
+     * @param instanceProvider the provider used to create instances of discovered classes
+     * @param logger           the logger used to report results (e.g. {@code plugin.getLogger()})
+     */
+    public LoaderRegistry(String basePackage, ClassLoader classLoader, InstanceProvider instanceProvider, Logger logger) {
         this.basePackage = basePackage;
         this.classLoader = classLoader;
         this.instanceProvider = instanceProvider;
+        this.logger = logger;
     }
 
     /**
@@ -62,9 +78,10 @@ public class LoaderRegistry {
 
     /**
      * Scans the base package, creates instances of all discovered classes,
-     * and delegates each to the appropriate {@link ClassTypeLoader}.
+     * and delegates each to every matching {@link ClassTypeLoader}.
      *
-     * @throws LoaderNotFoundException if a discovered class has no matching registered loader
+     * <p>A failure for one class (instantiation or processing) is logged
+     * and does not stop the registration of the remaining classes.
      */
     public void loadAll() {
         Set<Class<? extends Annotation>> types = loaders.stream()
@@ -79,15 +96,16 @@ public class LoaderRegistry {
         long start = System.currentTimeMillis();
 
         for (Class<?> clazz : classes) {
-            ClassTypeLoader loader = findLoader(clazz);
-
-            Object instance;
             try {
-                instance = instanceProvider.getInstance(clazz);
-                loader.process(clazz, instance);
+                List<ClassTypeLoader> matching = findLoaders(clazz);
+                Object instance = instanceProvider.getInstance(clazz);
+
+                for (ClassTypeLoader loader : matching) {
+                    loader.process(clazz, instance);
+                }
                 success++;
             } catch (Exception e) {
-                logger.log(Level.SEVERE, "Failed to register: " + clazz.getSimpleName(), e);
+                logger.log(Level.SEVERE, "Failed to register: " + clazz.getName(), e);
                 failed++;
             }
         }
@@ -98,10 +116,14 @@ public class LoaderRegistry {
         }
     }
 
-    private ClassTypeLoader findLoader(Class<?> clazz) {
-        return loaders.stream()
+    private List<ClassTypeLoader> findLoaders(Class<?> clazz) {
+        List<ClassTypeLoader> matching = loaders.stream()
                 .filter(loader -> clazz.isAnnotationPresent(loader.type()))
-                .findFirst()
-                .orElseThrow(() -> new LoaderNotFoundException("No loader registered for class: " + clazz.getName()));
+                .collect(Collectors.toList());
+
+        if (matching.isEmpty()) {
+            throw new LoaderNotFoundException("No loader registered for class: " + clazz.getName());
+        }
+        return matching;
     }
 }

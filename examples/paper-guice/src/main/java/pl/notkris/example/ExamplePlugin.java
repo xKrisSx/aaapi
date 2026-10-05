@@ -15,7 +15,8 @@ import pl.notkris.example.loader.ListenerLoader;
  * <p>By swapping {@link DefaultInstanceProvider} for
  * {@link GuiceInstanceProvider}, all discovered classes
  * are instantiated by Guice - enabling full {@code @Inject} constructor injection
- * without any manual wiring.
+ * without any manual wiring. {@link PluginModule} makes the plugin itself
+ * and common server objects injectable.
  *
  * <p>See {@link PlayerJoinListener} for a practical example
  * of injecting a service into a listener.
@@ -35,14 +36,16 @@ public class ExamplePlugin extends JavaPlugin {
     }
 
     private void register() {
-        Injector injector = Guice.createInjector();
+        Injector injector = Guice.createInjector(new PluginModule(this));
         LoaderRegistry registry = new LoaderRegistry(
                 "pl.notkris.example",
                 getClass().getClassLoader(),
-                new GuiceInstanceProvider(injector) // Guice handles instantiation and @Inject
+                new GuiceInstanceProvider(injector), // Guice handles instantiation and @Inject
+                getLogger()
         );
 
-        registry.register(new ListenerLoader(getServer().getPluginManager(), this));
+        // loaders can be created by Guice too
+        registry.register(injector.getInstance(ListenerLoader.class));
         registry.loadAll();
     }
 }

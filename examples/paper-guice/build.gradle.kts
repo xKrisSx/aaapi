@@ -10,10 +10,8 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":guice"))
+    implementation(project(":guice")) // exposes Guice transitively (api)
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-
-    implementation("com.google.inject:guice:7.0.0")
 }
 
 tasks {
@@ -25,6 +23,11 @@ tasks {
         archiveFileName.set("aaapi-example-guice.jar")
         manifest {
             attributes["Encoding"] = "UTF-8"
+        }
+
+        // Guava (required by Guice) is already provided by the Paper server
+        dependencies {
+            exclude(dependency("com.google.guava:.*"))
         }
     }
 }

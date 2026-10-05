@@ -30,8 +30,11 @@ public class TaskLoader extends ClassTypeLoader {
         long delay() default 0;
         /** Interval in ticks between executions. Default: {@code 0}. */
         long period() default 0;
-        /** Whether the task should run asynchronously. Default: {@code true}. */
-        boolean async() default true;
+        /**
+         * Whether the task should run asynchronously. Default: {@code false}.
+         * Async tasks must not use most of the Bukkit API (worlds, entities, inventories).
+         */
+        boolean async() default false;
     }
 
     private final ExamplePlugin plugin;
